@@ -61,7 +61,6 @@ app.post("/login", function(req, res){
     const loginpassword = req.body.password;
     User.findOne({email: loginusername})
     .then(function(foundUser){
-        console.log(foundUser);
         if (foundUser) {
             if (foundUser.password === loginpassword) {
                 res.render("secrets")
