@@ -6,7 +6,8 @@ const ejs = require("ejs");
 const _ = require("lodash")
 const mongoose = require("mongoose")
 const app = express();
-var md5 = require('md5');
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 // ENV variables
 require("dotenv").config();
@@ -41,31 +42,37 @@ app.get("/register", function(req, res){
 });
 
 app.post("/register", function(req, res){
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
-    })
-    newUser.save()
-    .then(function(){
-        console.log("Succesfully added");
-        res.render("secrets")
-    })
-    .catch(function(err){
-        console.log(err);
-    })
+
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        })
+        newUser.save()
+        .then(function(){
+            console.log("Succesfully added");
+            res.render("secrets")
+        })
+        .catch(function(err){
+            console.log(err);
+        })
+    });
 })
 
 app.post("/login", function(req, res){
     const loginusername = req.body.username;
-    const loginpassword = md5(req.body.password);
+    const loginpassword = req.body.password;
     User.findOne({email: loginusername})
     .then(function(foundUser){
         if (foundUser) {
-            if (foundUser.password === loginpassword) {
-                res.render("secrets")
-            } else {
-                console.log("Incorrect password");
-            }
+            bcrypt.compare(loginpassword, foundUser.password, function(err, result) {
+                if(result === true){
+                    res.render("secrets")
+                } else{
+                    console.log("Wrong pass");
+                } 
+            });
         } else { 
             console.log("Username not registered");
         }
