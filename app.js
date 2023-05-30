@@ -11,6 +11,7 @@ var encrypt = require('mongoose-encryption');
 // ENV variables
 require("dotenv").config();
 const PORT = process.env.PORT
+const SECRET = process.env.SECRET;
 
 // APP set and use
 app.set('view engine', 'ejs');
@@ -23,8 +24,8 @@ const userSchema = new mongoose.Schema({
     email: String,
     password: String
 });
-const secret = "Thisisourlittlescret.";
-userSchema.plugin(encrypt, {secret: secret, encryptedFields: ['password']})
+
+userSchema.plugin(encrypt, {secret: SECRET, encryptedFields: ['password']})
 const User = new mongoose.model("User", userSchema)
 
 //APP RUNNING
@@ -58,20 +59,21 @@ app.post("/register", function(req, res){
 app.post("/login", function(req, res){
     const loginusername = req.body.username;
     const loginpassword = req.body.password;
-    User.find({email: loginusername, password: loginpassword}).exec()
-        .then(function(foundUser) {
-            if (foundUser) {
-                // User found, handle authentication success
-                res.render("Secrets");
+    User.findOne({email: loginusername})
+    .then(function(foundUser){
+        console.log(foundUser);
+        if (foundUser) {
+            if (foundUser.password === loginpassword) {
+                res.render("secrets")
             } else {
-                // User not found or authentication failed
-                console.log("User not found or authentication failed");
+                console.log("Incorrect password");
             }
-        })
-        .catch(function(err) {
-            // Error occurred during database query
-            console.log(err);
-        });
+        } else { 
+            console.log("Username not registered");
+        }
+    }).catch(function(err){
+        console.log(err);
+    })
 });
 
 
