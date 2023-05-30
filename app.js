@@ -11,7 +11,7 @@ var encrypt = require('mongoose-encryption');
 // ENV variables
 require("dotenv").config();
 const PORT = process.env.PORT
-const SECRET = process.env.SECRET;
+const SECRET = process.env.SECRET; //ENV variable
 
 // APP set and use
 app.set('view engine', 'ejs');
