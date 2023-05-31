@@ -1,4 +1,6 @@
 //jshint esversion:6
+
+//*********************************************** */
 // Modules declaration
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -6,28 +8,45 @@ const ejs = require("ejs");
 const _ = require("lodash")
 const mongoose = require("mongoose")
 const app = express();
-const bcrypt = require("bcrypt");
-const saltRounds = 10;
+const session = require("express-session")
+const passport = require("passport")
+const passportLocalMongoose = require("passport-local-mongoose")
 
+//*********************************************** */
 // ENV variables
 require("dotenv").config();
 const PORT = process.env.PORT
-const SECRET = process.env.SECRET; //ENV variable
+const SECRET = process.env.SECRET
 
+//*********************************************** */
 // APP set and use
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
+app.use(session({
+  secret: SECRET,
+  resave: false,
+  saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 
+
+//*********************************************** */
 // DB construction
-mongoose.connect("mongodb://127.0.0.1:27017/userDB", {useNewUrlParser: true})
+mongoose.connect("mongodb://127.0.0.1:27017/userDB", {useNewUrlParser: true});
+// mongoose.set("useCreateIndex", true);  //Is not useful anymore
 const userSchema = new mongoose.Schema({
     email: String,
     password: String
 });
+userSchema.plugin(passportLocalMongoose);
+const User = new mongoose.model("User", userSchema);
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
-const User = new mongoose.model("User", userSchema)
-
+//*********************************************** */
 //APP RUNNING
 app.get("/", function(req, res){
     res.render("home");
@@ -41,47 +60,56 @@ app.get("/register", function(req, res){
     res.render("register");
 });
 
-app.post("/register", function(req, res){
+app.get("/secrets", function(req,res){
+    console.log(req.isAuthenticated());
+    if(req.isAuthenticated()){
+        res.render("secrets")
+    } else {
+        res.redirect("/login")
+    }
+})
 
-    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-        // Store hash in your password DB.
-        const newUser = new User({
-            email: req.body.username,
-            password: hash
-        })
-        newUser.save()
-        .then(function(){
-            console.log("Succesfully added");
-            res.render("secrets")
-        })
-        .catch(function(err){
+app.get("/logout", function(req,res, next){
+    req.logout(function(err) {
+        if (err) { 
+            return next(err); 
+        }
+        console.log("Logged out succesfuly");
+        res.redirect('/');
+      });
+})
+
+app.post("/register", function(req, res){
+    User.register({username: req.body.username}, req.body.password, function(err,user){
+        if(err){
             console.log(err);
-        })
-    });
+            res.redirect("/register");
+        } else {
+            passport.authenticate("local")(req,res, function(){
+                res.redirect("/secrets");
+            });
+        }
+    })
 })
 
 app.post("/login", function(req, res){
-    const loginusername = req.body.username;
-    const loginpassword = req.body.password;
-    User.findOne({email: loginusername})
-    .then(function(foundUser){
-        if (foundUser) {
-            bcrypt.compare(loginpassword, foundUser.password, function(err, result) {
-                if(result === true){
-                    res.render("secrets")
-                } else{
-                    console.log("Wrong pass");
-                } 
-            });
-        } else { 
-            console.log("Username not registered");
+    const user = new User({
+        username: req.body.username,
+        password: req.body.password
+    });
+
+    req.login(user, function(err){
+        if(err){
+            console.log();
+        } else{ 
+            passport.authenticate("local")(req,res, function(){
+                res.redirect("/secrets")
+            })
         }
-    }).catch(function(err){
-        console.log(err);
     })
 });
 
-
+//*********************************************** */
 //LISTEN
 app.listen(PORT, function () {
     console.log("Server running on port: " + PORT);
