@@ -43,7 +43,8 @@ const userSchema = new mongoose.Schema({
     email: String, 
     password: String, 
     googleId: { type: String, unique: true, sparse: true },
-    facebookId: { type: String, unique: true, sparse: true }
+    facebookId: { type: String, unique: true, sparse: true },
+    secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -67,7 +68,7 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:3000/auth/google/secrets",
     userProfileURL: 'https://www.googleapis.com/oauth2/v3/userinfo'
 }, function (accessToken, refreshToken, profile, cb) {
-    console.log(profile);
+    // console.log(profile);
     User.findOrCreate({
         googleId: profile.id,
         username: profile.displayName
@@ -81,7 +82,7 @@ passport.use(new FacebookStrategy({
     clientSecret: FACEBOOK_APP_SECRET,
     callbackURL: "http://localhost:3000/auth/facebook/secrets"
 }, function (accessToken, refreshToken, profile, cb) {
-    console.log(profile)
+    // console.log(profile)
     User.findOrCreate({
         facebookId: profile.id,
         username: profile.displayName
@@ -121,12 +122,11 @@ app.get("/register", function (req, res) {
 });
 
 app.get("/secrets", function (req, res) {
-    console.log(req.isAuthenticated());
-    if (req.isAuthenticated()) {
-        res.render("secrets")
-    } else {
-        res.redirect("/login")
-    }
+    User.find({"secret":{$ne: null}}).then(function(foundUsers){
+        res.render("secrets", {usersWithsecrets: foundUsers});
+    }).catch(function(err){
+        console.log(err);
+    })
 })
 
 app.get("/logout", function (req, res, next) {
@@ -137,6 +137,14 @@ app.get("/logout", function (req, res, next) {
         console.log("Logged out succesfuly");
         res.redirect('/');
     });
+})
+
+app.get("/submit", function(req,res){
+    if (req.isAuthenticated()) {
+        res.render("submit")
+    } else {
+        res.redirect("/login")
+    }
 })
 
 app.post("/register", function (req, res) {
@@ -167,6 +175,19 @@ app.post("/login", function (req, res) {
         }
     })
 });
+
+app.post("/submit", function(req,res){
+    const submittedSecret = req.body.secret;
+    console.log(req.user._id);
+    User.findById(req.user._id).then(function(foundUser){
+        foundUser.secret = submittedSecret;
+        foundUser.save().then(function(){
+            res.redirect("/secrets");
+        })
+    }).catch(function(err){
+        console.log(err);
+    })
+})
 
 // *********************************************** */
 // LISTEN
